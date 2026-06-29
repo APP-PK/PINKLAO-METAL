@@ -26,14 +26,12 @@
     <div id="status" class="status-message">กำลังโหลดข้อมูลสินค้า...</div>
     
     <div id="productCard" class="product-card">
-        <img id="colorImg" src="" alt="ตัวอย่างสี" class="color-banner" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'100%\' height=\'100%\'%3E%3Crect width=\'100%\' height=\'100%\' fill=\'%23eee\'/%3E%3Ctext x=\'50%\' y=\'50%\' dominant-baseline=\'middle\' text-anchor=\'middle\' font-family=\'sans-serif\' font-size=\'14px\' fill=\'%23999\'%3Eไม่มีรูปภาพ%3C/text%3E%3C/svg%3E'">
         <div class="card-content">
             <div class="brand-name" id="brandDisplay">ยี่ห้อ</div>
             <div id="productName" class="product-title">ชื่อสินค้า</div>
             
             <div class="meta-info">
                 <div class="meta-item"><span class="meta-label">รหัสสินค้า:</span><span id="prodId">-</span></div>
-                <div class="meta-item"><span class="meta-label">จำนวนรับเข้า:</span><span id="prodQty" class="highlight-qty">-</span></div>
                 <div class="meta-item"><span class="meta-label">เฉดสี:</span><span id="colorName">-</span></div>
                 <div class="meta-item"><span class="meta-label">วันที่รับเข้า:</span><span id="prodDate">-</span></div>
             </div>
@@ -72,11 +70,14 @@
                     document.getElementById("productName").innerText = p.name || "-";
                     document.getElementById("prodId").innerText = p.id || "-";
                     
-                    // แสดงจำนวน: ค่าจาก QR Code (จำนวน + หน่วยนับ) หรือ ดึงจากชีต
-                    if (qtyFromQR) {
-                        document.getElementById("prodQty").innerText = `${qtyFromQR} ${unitFromQR || ""}`.trim();
-                    } else {
-                        document.getElementById("prodQty").innerText = p.quantity || "ไม่ระบุ";
+                    // แสดงจำนวน: (เอาออกตามคำขอผู้ใช้งาน)
+                    const prodQtyEl = document.getElementById("prodQty");
+                    if (prodQtyEl) {
+                        if (qtyFromQR) {
+                            prodQtyEl.innerText = `${qtyFromQR} ${unitFromQR || ""}`.trim();
+                        } else {
+                            prodQtyEl.innerText = p.quantity || "ไม่ระบุ";
+                        }
                     }
                     
                     document.getElementById("colorName").innerText = p.color || "-";
@@ -89,8 +90,9 @@
                     document.getElementById("instructions").innerText = p.วิธีใช้ || p.instructions || "-";
                     document.getElementById("precautions").innerText = p.ข้อควรระวัง || p.precautions || "-";
                     
-                    if (p.image) {
-                        document.getElementById("colorImg").src = `colors/${p.image}`;
+                    const colorImgEl = document.getElementById("colorImg");
+                    if (colorImgEl && p.image) {
+                        colorImgEl.src = `colors/${p.image}`;
                     }
 
                     document.getElementById("status").style.display = "none";
