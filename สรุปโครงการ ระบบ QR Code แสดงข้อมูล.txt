@@ -1,0 +1,288 @@
+สรุปโครงการ: ระบบ QR Code แสดงข้อมูลสินค้าและพิมพ์สติกเกอร์สำหรับ: ปิ่นเกล้าโลหะภัณฑ์ (Pinklao Metal Co., Ltd.)เอกสารนี้รวบรวมสถาปัตยกรรมและซอร์สโค้ดทั้งหมด สำหรับการพัฒนาระบบสแกน QR Code ดูรายละเอียดสินค้าบนมือถือ และระบบหน้าจอสั่งพิมพ์สติกเกอร์ติดผลิตภัณฑ์ ขนาด 78mm x 103mm (อัปเดตรองรับระบบเลือกยี่ห้อ, เฉดสีอลูมิเนียม และการระบุจำนวน)🏗 1. ภาพรวมสถาปัตยกรรมระบบ (System Architecture)ระบบถูกออกแบบเป็น Headless Architecture แยกส่วนหน้าบ้านและหลังบ้านออกจากกัน เพื่อให้ทำงานได้รวดเร็วและไม่มีค่าใช้จ่ายในการโฮสต์ฐานข้อมูล (Database): ใช้ Google Sheets สำหรับเก็บข้อมูลสินค้าBackend API: ใช้ Google Apps Script ทำหน้าที่ดึงข้อมูลจากชีตแปลงเป็น JSON ส่งให้หน้าเว็บAdmin & Print View: ไฟล์ HTML สำหรับให้พนักงานเลือกข้อมูลผ่าน Dropdown, กรอกจำนวน, ดูพรีวิวสติกเกอร์ และสั่งพิมพ์Customer View: ไฟล์ HTML โฮสต์บน GitHub Pages แสดงผลรูปแบบ Card UI เมื่อลูกค้าสแกน QR Code🛠 2. การเตรียมฐานข้อมูล (Google Sheets)สร้าง Google Sheets และตั้งชื่อหัวคอลัมน์ในแถวที่ 1 (Row 1) ดังนี้ (เพิ่มคอลัมน์ quantity ไว้เผื่อต้องการบันทึกเป็นค่าเริ่มต้น):idnamecolorbrandquantitydateimageinstructionsAL001อลูมิเนียมเส้นหน้าตัดอบนมthaimetal502026-06-29color-milk.png1. ตรวจสอบความเรียบร้อยก่อนประกอบAL002ชุดบานเลื่อน 2 สลับเทาซาฮาร่าInfinite Aluminium102026-07-01color-sahara.png1. ใช้อุปกรณ์ติดตั้งมาตรฐาน(คอลัมน์ image ให้ใส่เฉพาะชื่อไฟล์ เช่น color-milk.png โดยไฟล์รูปจริงจะนำไปเก็บไว้ใน GitHub)⚙️ 3. สร้าง API (Google Apps Script)ในหน้า Google Sheets ไปที่เมนู ส่วนขยาย (Extensions) -> Apps Scriptวางโค้ดด้านล่างนี้ -> กด การทำให้ใช้งานได้ (Deploy) -> การทำให้ใช้งานได้ใหม่ (New deployment)เลือกประเภท: เว็บแอป (Web app) / สิทธิ์การเข้าถึง: ทุกคน (Anyone)คัดลอก Web app URL เก็บไว้ใช้งานfunction doGet(e) {
+  var output = ContentService.createTextOutput();
+  try {
+    var id = e.parameter.id;
+    if (!id) return createJsonResponse({ status: "error", message: "Missing product ID" });
+    
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    var data = sheet.getDataRange().getValues();
+    var headers = data[0];
+    var productData = null;
+    
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][0].toString().trim() === id.toString().trim()) {
+        productData = {};
+        for (var j = 0; j < headers.length; j++) {
+          productData[headers[j]] = data[i][j];
+        }
+        break;
+      }
+    }
+    
+    if (productData) {
+      if (productData.date instanceof Date) {
+        productData.date = Utilities.formatDate(productData.date, Session.getScriptTimeZone(), "yyyy-MM-dd");
+      }
+      return createJsonResponse({ status: "success", data: productData });
+    } else {
+      return createJsonResponse({ status: "error", message: "Product not found" });
+    }
+  } catch (err) {
+    return createJsonResponse({ status: "error", message: err.toString() });
+  }
+}
+
+function createJsonResponse(object) {
+  return ContentService.createTextOutput(JSON.stringify(object)).setMimeType(ContentService.MimeType.JSON);
+}
+🖨 4. ระบบสร้างและพิมพ์สติกเกอร์ (Admin Print)สร้างไฟล์ print-sticker.html สำหรับแอดมิน (เพิ่มช่องใส่จำนวนที่เข้าระบบเรียบร้อยแล้ว)การพิมพ์: เลือก Paper size เป็น 78x103mm และตั้งค่า Margins เป็น None<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>ระบบพิมพ์สติกเกอร์ - ปิ่นเกล้าโลหะภัณฑ์</title>
+    <script src="[https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js](https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js)"></script>
+    <style>
+        @media screen {
+            body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #f4f6f9; padding: 30px; margin: 0; }
+            .admin-container { max-width: 1000px; margin: 0 auto; display: block; }
+            .header-banner { background: #1e3a8a; color: white; padding: 20px; border-radius: 8px 8px 0 0; text-align: center; }
+            .workspace { background: white; padding: 30px; border-radius: 0 0 8px 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); display: flex; }
+            .control-panel { width: 45%; padding-right: 30px; border-right: 1px solid #e5e7eb; }
+            .preview-panel { width: 55%; padding-left: 30px; text-align: center; }
+            label { display: block; margin-bottom: 8px; font-weight: 600; color: #4b5563; font-size: 14px; }
+            input, select { width: 100%; padding: 10px; margin-bottom: 18px; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box; font-size: 15px; }
+            .btn { width: 100%; padding: 12px; margin-bottom: 12px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
+            .btn-primary { background: #1e3a8a; color: white; }
+            .btn-success { background: #10b981; color: white; }
+        }
+
+        /* โครงสร้างสติกเกอร์ 78mm x 103mm */
+        #sticker {
+            width: 78mm; height: 103mm; background: #ffffff; box-sizing: border-box;
+            padding: 6mm; display: flex; flex-direction: column; justify-content: space-between;
+            align-items: center; border: 1px dashed #9ca3af; overflow: hidden; margin: 0 auto;
+        }
+        .logo-area { width: 100%; text-align: center; border-bottom: 2px solid #1e3a8a; padding-bottom: 3mm; margin-bottom: 2mm; }
+        .logo-text-main { font-size: 13pt; font-weight: 800; color: #1e3a8a; margin: 0; }
+        .logo-text-sub { font-size: 7pt; color: #4b5563; margin: 0.5mm 0 0 0; }
+        .content-area { width: 100%; flex-grow: 1; display: flex; flex-direction: column; align-items: center; padding-top: 2mm; }
+        .product-name-label { font-size: 8pt; color: #6b7280; align-self: flex-start; margin: 0; }
+        .product-name { font-size: 12pt; font-weight: 700; text-align: left; width: 100%; margin: 1mm 0 1mm 0; line-height: 1.3; }
+        .brand-row { display: flex; justify-content: space-between; width: 100%; margin-bottom: 3mm; align-items: center; }
+        .brand-name { font-size: 10pt; color: #1e3a8a; font-weight: bold; }
+        .qty-badge { font-size: 10pt; font-weight: bold; color: #d97706; background: #fef3c7; padding: 2px 6px; border-radius: 4px; border: 1px solid #fde68a; }
+        .color-info-box { width: 100%; display: flex; align-items: center; background: #f9fafb; border: 1px solid #e5e7eb; padding: 2mm; margin-bottom: 3mm; }
+        .color-swatch-preview { width: 10mm; height: 10mm; border: 1px solid #d1d5db; margin-right: 3mm; }
+        .color-text-details { display: flex; flex-direction: column; }
+        .color-title-label { font-size: 7pt; color: #6b7280; margin: 0; }
+        .color-name-value { font-size: 11pt; font-weight: 700; margin: 0; }
+        #qrcode img { width: 40mm !important; height: 40mm !important; }
+        .sticker-footer { font-size: 7.5pt; color: #6b7280; text-align: center; border-top: 1px dashed #e5e7eb; width: 100%; padding-top: 2mm; margin-top: 1mm; }
+
+        @media print {
+            @page { size: 78mm 103mm; margin: 0; }
+            body { background: white; padding: 0; margin: 0; }
+            .admin-container { display: none !important; }
+            #sticker { border: none; padding: 6mm; page-break-inside: avoid; page-break-after: always; display: flex !important; }
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-container">
+        <div class="header-banner"><h1>ระบบพิมพ์สติกเกอร์ — ปิ่นเกล้าโลหะภัณฑ์</h1></div>
+        <div class="workspace">
+            <div class="control-panel">
+                <label>รหัสสินค้า (ID):</label>
+                <input type="text" id="prodId" value="AL001" oninput="updatePreview()">
+                
+                <label>ชื่อสินค้า:</label>
+                <input type="text" id="prodName" value="อลูมิเนียมเส้นหน้าตัด" oninput="updatePreview()">
+                
+                <label>ยี่ห้อ (Brand):</label>
+                <select id="brandName" onchange="updatePreview()">
+                    <option value="thaimetal">Thaimetal</option>
+                    <option value="Infinite Aluminium">Infinite Aluminium</option>
+                </select>
+
+                <label>สี / เฉดสี:</label>
+                <select id="colorName" onchange="updatePreview()">
+                    <option value="อบนม" data-hex="#FDFCF0">อบนม</option>
+                    <option value="อบดำ" data-hex="#2b2b2b">อบดำ</option>
+                    <option value="เทาซาฮาร่า" data-hex="#595959">เทาซาฮาร่า</option>
+                    <option value="อบฟ้า" data-hex="#4A90E2">อบฟ้า</option>
+                    <option value="สักทอง" data-hex="#C19A6B">สักทอง</option>
+                    <option value="มูจิ" data-hex="#E4D5B7">มูจิ</option>
+                </select>
+
+                <label>จำนวนที่รับเข้า (Quantity):</label>
+                <input type="text" id="prodQty" value="50 เส้น" placeholder="เช่น 50 เส้น, 10 กล่อง" oninput="updatePreview()">
+
+                <button class="btn btn-primary" onclick="generateStickerCode()">อัปเดตข้อมูล</button>
+                <button class="btn btn-success" onclick="window.print()">สั่งพิมพ์ฉลาก (78x103mm)</button>
+            </div>
+            <div class="preview-panel">
+                <div id="sticker">
+                    <div class="logo-area">
+                        <div class="logo-text-main">ปิ่นเกล้าโลหะภัณฑ์</div>
+                        <div class="logo-text-sub">PINKLAO METAL CO., LTD.</div>
+                    </div>
+                    <div class="content-area">
+                        <p class="product-name-label">ชื่อสินค้า / PRODUCT:</p>
+                        <div class="product-name" id="lblTitle">อลูมิเนียมเส้นหน้าตัด</div>
+                        
+                        <div class="brand-row">
+                            <div class="brand-name" id="lblBrand">Thaimetal</div>
+                            <div class="qty-badge" id="lblQty">จำนวน: 50 เส้น</div>
+                        </div>
+                        
+                        <div class="color-info-box">
+                            <div class="color-swatch-preview" id="swatchPreview"></div>
+                            <div class="color-text-details">
+                                <p class="color-title-label">เฉดสี / COLOR:</p>
+                                <p class="color-name-value" id="lblColor">อบนม</p>
+                            </div>
+                        </div>
+                        <div id="qrcode"></div>
+                    </div>
+                    <div class="sticker-footer">สแกนเพื่อตรวจสอบรายละเอียดสินค้าเพิ่มเติม</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ⚠️ เปลี่ยน URL เป็นลิงก์ GitHub Pages ของคุณ ⚠️
+        const GITHUB_PAGES_URL = "[https://yourusername.github.io/paint-catalog/](https://yourusername.github.io/paint-catalog/)"; 
+        const qr = new QRCode(document.getElementById("qrcode"), { width: 160, height: 160, correctLevel: QRCode.CorrectLevel.H });
+
+        function updatePreview() {
+            // อัปเดตข้อความ
+            document.getElementById("lblTitle").innerText = document.getElementById("prodName").value || "-";
+            document.getElementById("lblBrand").innerText = document.getElementById("brandName").value;
+            
+            // อัปเดตจำนวน
+            const qtyInput = document.getElementById("prodQty").value.trim();
+            document.getElementById("lblQty").innerText = qtyInput ? `จำนวน: ${qtyInput}` : "";
+            document.getElementById("lblQty").style.display = qtyInput ? "block" : "none";
+            
+            // ดึงข้อมูลสี
+            const colorSelect = document.getElementById("colorName");
+            const selectedColorText = colorSelect.options[colorSelect.selectedIndex].text;
+            const selectedColorHex = colorSelect.options[colorSelect.selectedIndex].getAttribute("data-hex");
+            
+            document.getElementById("lblColor").innerText = selectedColorText;
+            document.getElementById("swatchPreview").style.backgroundColor = selectedColorHex;
+        }
+
+        function generateStickerCode() {
+            const id = document.getElementById("prodId").value.trim();
+            const qty = document.getElementById("prodQty").value.trim();
+            
+            if(!id) return alert("โปรดระบุรหัสสินค้า");
+            qr.clear();
+            
+            // ฝังจำนวนเข้าไปใน URL ของ QR Code ด้วย
+            const targetUrl = `${GITHUB_PAGES_URL}?id=${encodeURIComponent(id)}&qty=${encodeURIComponent(qty)}`;
+            qr.makeCode(targetUrl);
+        }
+        
+        window.onload = () => { updatePreview(); generateStickerCode(); };
+    </script>
+</body>
+</html>
+📱 5. หน้าจอแสดงผลสำหรับลูกค้า (Customer View)โฮสต์บน GitHub Pagesสร้างโฟลเดอร์ colors/ ไว้เก็บไฟล์รูปภาพสร้างไฟล์ index.html นำโค้ดนี้ไปใส่ (รองรับการดึงข้อมูล จำนวน จากการสแกน QR Code):<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>รายละเอียดข้อมูลสินค้า - ปิ่นเกล้าโลหะภัณฑ์</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; background: #f5f6f8; margin: 0; padding: 15px; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+        .product-card { background: #fff; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.08); width: 100%; max-width: 420px; overflow: hidden; display: none; }
+        .color-banner { width: 100%; height: 180px; object-fit: cover; background-color: #eaeaea; }
+        .card-content { padding: 20px; }
+        .brand-name { font-size: 14px; color: #1e3a8a; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }
+        .product-title { font-size: 20px; font-weight: bold; margin: 0 0 15px 0; }
+        .meta-info { display: flex; flex-direction: column; gap: 8px; font-size: 14px; color: #666; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #eee; }
+        .meta-item { display: flex; }
+        .meta-label { font-weight: 600; width: 85px; color: #444; }
+        .highlight-qty { color: #d97706; font-weight: bold; background: #fef3c7; padding: 2px 8px; border-radius: 4px; }
+        .instruction-section { background: #f8f9fa; border-left: 4px solid #1e3a8a; padding: 12px 15px; border-radius: 0 8px 8px 0; }
+        .instruction-title { font-size: 15px; font-weight: bold; color: #1e3a8a; margin: 0 0 8px 0; }
+        .instruction-text { font-size: 14px; color: #333; line-height: 1.6; white-space: pre-line; }
+        .status-message { text-align: center; color: #666; padding: 20px; }
+        .error { color: #dc3545; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div id="status" class="status-message">กำลังโหลดข้อมูลสินค้า...</div>
+    
+    <div id="productCard" class="product-card">
+        <img id="colorImg" src="" alt="ตัวอย่างสี" class="color-banner" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\'[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)\' width=\'100%\' height=\'100%\'%3E%3Crect width=\'100%\' height=\'100%\' fill=\'%23eee\'/%3E%3Ctext x=\'50%\' y=\'50%\' dominant-baseline=\'middle\' text-anchor=\'middle\' font-family=\'sans-serif\' font-size=\'14px\' fill=\'%23999\'%3Eไม่มีรูปภาพ%3C/text%3E%3C/svg%3E'">
+        <div class="card-content">
+            <div class="brand-name" id="brandDisplay">ยี่ห้อ</div>
+            <div id="productName" class="product-title">ชื่อสินค้า</div>
+            
+            <div class="meta-info">
+                <div class="meta-item"><span class="meta-label">รหัสสินค้า:</span><span id="prodId">-</span></div>
+                <div class="meta-item"><span class="meta-label">จำนวนรับเข้า:</span><span id="prodQty" class="highlight-qty">-</span></div>
+                <div class="meta-item"><span class="meta-label">เฉดสี:</span><span id="colorName">-</span></div>
+                <div class="meta-item"><span class="meta-label">วันที่รับเข้า:</span><span id="prodDate">-</span></div>
+            </div>
+
+            <div class="instruction-section">
+                <div class="instruction-title">รายละเอียด / วิธีใช้งาน</div>
+                <div id="instructions" class="instruction-text">-</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ⚠️ เปลี่ยน URL นี้เป็น Web App URL ที่ได้จาก Google Apps Script ⚠️
+        const API_URL = "[https://script.google.com/macros/s/XXXXX/exec](https://script.google.com/macros/s/XXXXX/exec)"; 
+
+        async function fetchProductDetails() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const productId = urlParams.get('id');
+            const qtyFromQR = urlParams.get('qty'); // ดึงจำนวนจาก QR Code
+
+            if (!productId) return showError("ไม่พบรหัสสินค้า (ID) ใน URL");
+
+            try {
+                const response = await fetch(`${API_URL}?id=${productId}`);
+                const result = await response.json();
+
+                if (result.status === "success") {
+                    const p = result.data;
+                    document.getElementById("productName").innerText = p.name || "-";
+                    document.getElementById("prodId").innerText = p.id || "-";
+                    
+                    // แสดงจำนวน: ลำดับความสำคัญคือ 1. ค่าจาก QR Code -> 2. ค่าจากฐานข้อมูลชีต -> 3. ไม่ระบุ
+                    document.getElementById("prodQty").innerText = qtyFromQR ? qtyFromQR : (p.quantity || "ไม่ระบุ");
+                    
+                    document.getElementById("colorName").innerText = p.color || "-";
+                    document.getElementById("brandDisplay").innerText = p.brand || "ปิ่นเกล้าโลหะภัณฑ์";
+                    document.getElementById("prodDate").innerText = p.date || "-";
+                    document.getElementById("instructions").innerText = p.instructions || "-";
+                    
+                    if (p.image) {
+                        document.getElementById("colorImg").src = `colors/${p.image}`;
+                    }
+
+                    document.getElementById("status").style.display = "none";
+                    document.getElementById("productCard").style.display = "block";
+                } else {
+                    showError("ไม่พบข้อมูลสินค้ารหัสนี้ในฐานข้อมูล");
+                }
+            } catch (e) {
+                showError("ระบบขัดข้อง ไม่สามารถเชื่อมต่อฐานข้อมูลได้");
+            }
+        }
+        
+        function showError(msg) { document.getElementById("status").innerHTML = `<span class="error">${msg}</span>`; }
+        
+        window.onload = fetchProductDetails;
+    </script>
+</body>
+</html>
+🔗 6. การเชื่อมต่อระบบ (จุดที่ต้องเปลี่ยนโค้ด)ในไฟล์ print-sticker.html (บรรทัด ~118): แก้ไขตัวแปร GITHUB_PAGES_URL ให้เป็น URL GitHub Pages ของคุณในไฟล์ index.html (บรรทัด ~61): แก้ไขตัวแปร API_URL ให้เป็นลิงก์ Web App URL ที่ได้จาก Google Apps Script

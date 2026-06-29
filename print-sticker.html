@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>ระบบพิมพ์สติกเกอร์ - ปิ่นเกล้าโลหะภัณฑ์</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        @media screen {
+            body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #f4f6f9; padding: 30px; margin: 0; }
+            .admin-container { max-width: 1000px; margin: 0 auto; display: block; }
+            .header-banner { background: #1e3a8a; color: white; padding: 20px; border-radius: 8px 8px 0 0; text-align: center; }
+            .workspace { background: white; padding: 30px; border-radius: 0 0 8px 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); display: flex; }
+            .control-panel { width: 45%; padding-right: 30px; border-right: 1px solid #e5e7eb; }
+            .preview-panel { width: 55%; padding-left: 30px; text-align: center; }
+            label { display: block; margin-bottom: 8px; font-weight: 600; color: #4b5563; font-size: 14px; }
+            input, select { width: 100%; padding: 10px; margin-bottom: 18px; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box; font-size: 15px; }
+            .btn { width: 100%; padding: 12px; margin-bottom: 12px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
+            .btn-primary { background: #1e3a8a; color: white; }
+            .btn-success { background: #10b981; color: white; }
+        }
+
+        /* โครงสร้างสติกเกอร์ 78mm x 103mm */
+        #sticker {
+            width: 78mm; height: 103mm; background: #ffffff; box-sizing: border-box;
+            padding: 6mm; display: flex; flex-direction: column; justify-content: space-between;
+            align-items: center; border: 1px dashed #9ca3af; overflow: hidden; margin: 0 auto;
+        }
+        .logo-area { width: 100%; text-align: center; border-bottom: 2px solid #1e3a8a; padding-bottom: 3mm; margin-bottom: 2mm; }
+        .logo-text-main { font-size: 13pt; font-weight: 800; color: #1e3a8a; margin: 0; }
+        .logo-text-sub { font-size: 7pt; color: #4b5563; margin: 0.5mm 0 0 0; }
+        .content-area { width: 100%; flex-grow: 1; display: flex; flex-direction: column; align-items: center; padding-top: 2mm; }
+        .product-name-label { font-size: 8pt; color: #6b7280; align-self: flex-start; margin: 0; }
+        .product-name { font-size: 12pt; font-weight: 700; text-align: left; width: 100%; margin: 1mm 0 1mm 0; line-height: 1.3; }
+        .brand-row { display: flex; justify-content: space-between; width: 100%; margin-bottom: 3mm; align-items: center; }
+        .brand-name { font-size: 10pt; color: #1e3a8a; font-weight: bold; }
+        .qty-badge { font-size: 10pt; font-weight: bold; color: #d97706; background: #fef3c7; padding: 2px 6px; border-radius: 4px; border: 1px solid #fde68a; }
+        .color-info-box { width: 100%; display: flex; align-items: center; background: #f9fafb; border: 1px solid #e5e7eb; padding: 2mm; margin-bottom: 3mm; }
+        .color-swatch-preview { width: 10mm; height: 10mm; border: 1px solid #d1d5db; margin-right: 3mm; }
+        .color-text-details { display: flex; flex-direction: column; }
+        .color-title-label { font-size: 7pt; color: #6b7280; margin: 0; }
+        .color-name-value { font-size: 11pt; font-weight: 700; margin: 0; }
+        #qrcode img { width: 40mm !important; height: 40mm !important; }
+        .sticker-footer { font-size: 7.5pt; color: #6b7280; text-align: center; border-top: 1px dashed #e5e7eb; width: 100%; padding-top: 2mm; margin-top: 1mm; }
+
+        @media print {
+            @page { size: 78mm 103mm; margin: 0; }
+            body { background: white; padding: 0; margin: 0; }
+            .admin-container { display: none !important; }
+            #sticker { border: none; padding: 6mm; page-break-inside: avoid; page-break-after: always; display: flex !important; }
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-container">
+        <div class="header-banner"><h1>ระบบพิมพ์สติกเกอร์ — ปิ่นเกล้าโลหะภัณฑ์</h1></div>
+        <div class="workspace">
+            <div class="control-panel">
+                <label>รหัสสินค้า (ID):</label>
+                <input type="text" id="prodId" value="AL001" oninput="updatePreview()">
+                
+                <label>ชื่อสินค้า:</label>
+                <input type="text" id="prodName" value="อลูมิเนียมเส้นหน้าตัด" oninput="updatePreview()">
+                
+                <label>ยี่ห้อ (Brand):</label>
+                <select id="brandName" onchange="updatePreview()">
+                    <option value="thaimetal">Thaimetal</option>
+                    <option value="Infinite Aluminium">Infinite Aluminium</option>
+                </select>
+
+                <label>สี / เฉดสี:</label>
+                <select id="colorName" onchange="updatePreview()">
+                    <option value="อบนม" data-hex="#FDFCF0">อบนม</option>
+                    <option value="อบดำ" data-hex="#2b2b2b">อบดำ</option>
+                    <option value="เทาซาฮาร่า" data-hex="#595959">เทาซาฮาร่า</option>
+                    <option value="อบฟ้า" data-hex="#4A90E2">อบฟ้า</option>
+                    <option value="สักทอง" data-hex="#C19A6B">สักทอง</option>
+                    <option value="มูจิ" data-hex="#E4D5B7">มูจิ</option>
+                </select>
+
+                <label>จำนวนที่รับเข้า (Quantity):</label>
+                <input type="text" id="prodQty" value="50 เส้น" placeholder="เช่น 50 เส้น, 10 กล่อง" oninput="updatePreview()">
+
+                <button class="btn btn-primary" onclick="generateStickerCode()">อัปเดตข้อมูล</button>
+                <button class="btn btn-success" onclick="window.print()">สั่งพิมพ์ฉลาก (78x103mm)</button>
+            </div>
+            <div class="preview-panel">
+                <div id="sticker">
+                    <div class="logo-area">
+                        <div class="logo-text-main">ปิ่นเกล้าโลหะภัณฑ์</div>
+                        <div class="logo-text-sub">PINKLAO METAL CO., LTD.</div>
+                    </div>
+                    <div class="content-area">
+                        <p class="product-name-label">ชื่อสินค้า / PRODUCT:</p>
+                        <div class="product-name" id="lblTitle">อลูมิเนียมเส้นหน้าตัด</div>
+                        
+                        <div class="brand-row">
+                            <div class="brand-name" id="lblBrand">Thaimetal</div>
+                            <div class="qty-badge" id="lblQty">จำนวน: 50 เส้น</div>
+                        </div>
+                        
+                        <div class="color-info-box">
+                            <div class="color-swatch-preview" id="swatchPreview"></div>
+                            <div class="color-text-details">
+                                <p class="color-title-label">เฉดสี / COLOR:</p>
+                                <p class="color-name-value" id="lblColor">อบนม</p>
+                            </div>
+                        </div>
+                        <div id="qrcode"></div>
+                    </div>
+                    <div class="sticker-footer">สแกนเพื่อตรวจสอบรายละเอียดสินค้าเพิ่มเติม</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ⚠️ เปลี่ยน URL เป็นลิงก์ GitHub Pages ของคุณ ⚠️
+        const GITHUB_PAGES_URL = "https://jarupat7.github.io/pinklao-sticker/"; 
+        const qr = new QRCode(document.getElementById("qrcode"), { width: 160, height: 160, correctLevel: QRCode.CorrectLevel.H });
+
+        function updatePreview() {
+            // อัปเดตข้อความ
+            document.getElementById("lblTitle").innerText = document.getElementById("prodName").value || "-";
+            document.getElementById("lblBrand").innerText = document.getElementById("brandName").value;
+            
+            // อัปเดตจำนวน
+            const qtyInput = document.getElementById("prodQty").value.trim();
+            document.getElementById("lblQty").innerText = qtyInput ? `จำนวน: ${qtyInput}` : "";
+            document.getElementById("lblQty").style.display = qtyInput ? "block" : "none";
+            
+            // ดึงข้อมูลสี
+            const colorSelect = document.getElementById("colorName");
+            const selectedColorText = colorSelect.options[colorSelect.selectedIndex].text;
+            const selectedColorHex = colorSelect.options[colorSelect.selectedIndex].getAttribute("data-hex");
+            
+            document.getElementById("lblColor").innerText = selectedColorText;
+            document.getElementById("swatchPreview").style.backgroundColor = selectedColorHex;
+        }
+
+        function generateStickerCode() {
+            const id = document.getElementById("prodId").value.trim();
+            const qty = document.getElementById("prodQty").value.trim();
+            
+            if(!id) return alert("โปรดระบุรหัสสินค้า");
+            qr.clear();
+            
+            // ฝังจำนวนเข้าไปใน URL ของ QR Code ด้วย
+            const targetUrl = `${GITHUB_PAGES_URL}?id=${encodeURIComponent(id)}&qty=${encodeURIComponent(qty)}`;
+            qr.makeCode(targetUrl);
+        }
+        
+        window.onload = () => { updatePreview(); generateStickerCode(); };
+    </script>
+</body>
+</html>

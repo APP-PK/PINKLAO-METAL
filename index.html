@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>รายละเอียดข้อมูลสินค้า - ปิ่นเกล้าโลหะภัณฑ์</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; background: #f5f6f8; margin: 0; padding: 15px; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+        .product-card { background: #fff; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.08); width: 100%; max-width: 420px; overflow: hidden; display: none; }
+        .color-banner { width: 100%; height: 180px; object-fit: cover; background-color: #eaeaea; }
+        .card-content { padding: 20px; }
+        .brand-name { font-size: 14px; color: #1e3a8a; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }
+        .product-title { font-size: 20px; font-weight: bold; margin: 0 0 15px 0; }
+        .meta-info { display: flex; flex-direction: column; gap: 8px; font-size: 14px; color: #666; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #eee; }
+        .meta-item { display: flex; }
+        .meta-label { font-weight: 600; width: 85px; color: #444; }
+        .highlight-qty { color: #d97706; font-weight: bold; background: #fef3c7; padding: 2px 8px; border-radius: 4px; }
+        .instruction-section { background: #f8f9fa; border-left: 4px solid #1e3a8a; padding: 12px 15px; border-radius: 0 8px 8px 0; }
+        .instruction-title { font-size: 15px; font-weight: bold; color: #1e3a8a; margin: 0 0 8px 0; }
+        .instruction-text { font-size: 14px; color: #333; line-height: 1.6; white-space: pre-line; }
+        .status-message { text-align: center; color: #666; padding: 20px; }
+        .error { color: #dc3545; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div id="status" class="status-message">กำลังโหลดข้อมูลสินค้า...</div>
+    
+    <div id="productCard" class="product-card">
+        <img id="colorImg" src="" alt="ตัวอย่างสี" class="color-banner" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'100%\' height=\'100%\'%3E%3Crect width=\'100%\' height=\'100%\' fill=\'%23eee\'/%3E%3Ctext x=\'50%\' y=\'50%\' dominant-baseline=\'middle\' text-anchor=\'middle\' font-family=\'sans-serif\' font-size=\'14px\' fill=\'%23999\'%3Eไม่มีรูปภาพ%3C/text%3E%3C/svg%3E'">
+        <div class="card-content">
+            <div class="brand-name" id="brandDisplay">ยี่ห้อ</div>
+            <div id="productName" class="product-title">ชื่อสินค้า</div>
+            
+            <div class="meta-info">
+                <div class="meta-item"><span class="meta-label">รหัสสินค้า:</span><span id="prodId">-</span></div>
+                <div class="meta-item"><span class="meta-label">จำนวนรับเข้า:</span><span id="prodQty" class="highlight-qty">-</span></div>
+                <div class="meta-item"><span class="meta-label">เฉดสี:</span><span id="colorName">-</span></div>
+                <div class="meta-item"><span class="meta-label">วันที่รับเข้า:</span><span id="prodDate">-</span></div>
+            </div>
+            
+            <div class="instruction-section">
+                <div class="instruction-title">รายละเอียด / วิธีใช้งาน</div>
+                <div id="instructions" class="instruction-text">-</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ⚠️ เปลี่ยน URL นี้เป็น Web App URL ที่ได้จาก Google Apps Script ⚠️
+        const API_URL = "https://script.google.com/macros/s/AKfycbxHmArj4bdz9KWBkR8wQ_ZJBhSgGl8XjTbkstDT6p3X_JHjAq-d7AO4e76FexMhhWR_/exec"; 
+
+        async function fetchProductDetails() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const productId = urlParams.get('id');
+            const qtyFromQR = urlParams.get('qty'); // ดึงจำนวนจาก QR Code
+
+            if (!productId) return showError("ไม่พบรหัสสินค้า (ID) ใน URL");
+
+            try {
+                const response = await fetch(`${API_URL}?id=${productId}`);
+                const result = await response.json();
+
+                if (result.status === "success") {
+                    const p = result.data;
+                    document.getElementById("productName").innerText = p.name || "-";
+                    document.getElementById("prodId").innerText = p.id || "-";
+                    
+                    // แสดงจำนวน: ลำดับความสำคัญคือ 1. ค่าจาก QR Code -> 2. ค่าจากฐานข้อมูลชีต -> 3. ไม่ระบุ
+                    document.getElementById("prodQty").innerText = qtyFromQR ? qtyFromQR : (p.quantity || "ไม่ระบุ");
+                    
+                    document.getElementById("colorName").innerText = p.color || "-";
+                    document.getElementById("brandDisplay").innerText = p.brand || "ปิ่นเกล้าโลหะภัณฑ์";
+                    document.getElementById("prodDate").innerText = p.date || "-";
+                    document.getElementById("instructions").innerText = p.instructions || "-";
+                    
+                    if (p.image) {
+                        document.getElementById("colorImg").src = `colors/${p.image}`;
+                    }
+
+                    document.getElementById("status").style.display = "none";
+                    document.getElementById("productCard").style.display = "block";
+                } else {
+                    showError("ไม่พบข้อมูลสินค้ารหัสนี้ในฐานข้อมูล");
+                }
+            } catch (e) {
+                showError("ระบบขัดข้อง ไม่สามารถเชื่อมต่อฐานข้อมูลได้");
+            }
+        }
+        
+        function showError(msg) { document.getElementById("status").innerHTML = `<span class="error">${msg}</span>`; }
+        
+        window.onload = fetchProductDetails;
+    </script>
+</body>
+</html>
