@@ -44,29 +44,46 @@
 
         @media print {
             @page { size: 78mm 103mm; margin: 0; }
-            body { background: white; padding: 0; margin: 0; }
             
-            /* ซ่อนส่วนแบนเนอร์และตัวควบคุมบนหน้าจอขณะพิมพ์ */
+            /* ซ่อนส่วนประกอบหน้าจอปกติ */
             .header-banner, 
             .control-panel { 
                 display: none !important; 
             }
             
-            /* รีเซ็ตเลย์เอาต์คอนเทนเนอร์เพื่อให้สติกเกอร์พิมพ์ได้เต็มหน้า */
-            .admin-container,
-            .workspace,
-            .preview-panel {
-                padding: 0 !important;
-                margin: 0 !important;
-                border: none !important;
-                box-shadow: none !important;
-                background: transparent !important;
-                display: block !important;
-                width: 100% !important;
-                max-width: none !important;
+            /* ซ่อนบอดี้หลักทั้งหมดเพื่อป้องกันเนื้อหาส่วนอื่นกวน */
+            body {
+                visibility: hidden;
+                background: white;
+                margin: 0;
+                padding: 0;
             }
             
-            #sticker { border: none; padding: 6mm; page-break-inside: avoid; page-break-after: always; display: flex !important; }
+            /* แสดงเฉพาะสติกเกอร์และเนื้อหาภายใน */
+            #sticker, 
+            #sticker * {
+                visibility: visible;
+            }
+            
+            /* ดึงสติกเกอร์มาวางมุมซ้ายบนสุดด้วยพิกัดสมบูรณ์ (Absolute) */
+            #sticker {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 78mm;
+                height: 103mm;
+                border: none !important;
+                padding: 6mm !important;
+                margin: 0 !important;
+                box-sizing: border-box;
+                display: flex !important;
+                flex-direction: column;
+                justify-content: space-between;
+                align-items: center;
+                background: #ffffff !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
         }
     </style>
 </head>
